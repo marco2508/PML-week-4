@@ -1,0 +1,177 @@
+---
+title: "Prediction Assigment"
+author: "Marco"
+date: "1-9-2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Prediction Assignment- Practical Machine Learning
+Goal  is to predict how  6 participants performed exercises as described in the “classe” variable in the training set. 
+The best scoring machine learning algorithm found  here is applied to the 20 test cases available in the test data and the predictions are submitted in appropriate format to the Course Project Prediction Quiz for automated grading.
+
+Note: calculation of this data/markdown really takes time. 
+Several minutes (5-10) on my 4th generation Intel I7 laptop.
+
+## Data Loading and Exploratory Analysis
+
+Data is coming from http://groupware.les.inf.puc-rio.br/har.
+This is copied from the authors website:  
+
+“Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E)."
+
+
+```{r prep, echo=FALSE}
+#Environment preparation
+#check installed packages
+packages <- c("knitr", "caret", "rpart", "rpart.plot", "randomForest", "gbm", "corrplot", "e1071")
+if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
+  install.packages(setdiff(packages, rownames(installed.packages())))  
+}
+
+library(knitr)
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+library(gbm)
+library(corrplot)
+library(e1071)
+```
+
+## Data Loading and Cleaning
+
+The training dataset is partitioned to create a Training set (70% of the data) for the modeling process and a Test set (remaining 30%) for the validations. 
+The testing dataset is not changed and will only be used for the quiz results generation.
+
+```{r data, echo=TRUE}
+#Download the datasets from provided URLs
+Training <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+Testing  <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+#Read the downloaded data files
+training <- read.csv(url(Training))
+testing  <- read.csv(url(Testing))
+
+#and partition them
+train_part  <- createDataPartition(training$classe, p=0.7, list=FALSE)
+TrainSet <- training[train_part, ]
+TestSet  <- training[-train_part, ]
+
+# summary( training )  "this one really takes too much space, so used in running not in output
+dim(training)
+```
+
+The training data set is made of 19622 observations on 160 columns. 
+We noticed (summary statement) that many columns have NA or blank values on many observations. 
+These columns are removed (90% or more empty). 
+The first seven columns of the CSv files give information about who and when, these will also be removed from the data.
+
+```{r NA, echo = FALSE}
+# FInd the columns having at least 90% of NA or blank values 
+indColToRemove <- which(colSums(is.na(TrainSet) |TrainSet=="")>0.9*dim(TrainSet)[1]) 
+TrainSetClean <- TrainSet[,-indColToRemove]
+TrainSetClean <- TrainSetClean[,-c(1:7)]
+#how do we proceed? 
+dim(TrainSetClean)
+
+# and do the same for the test set
+indColToRemove <- which(colSums(is.na(TestSet) |TestSet=="")>0.9*dim(TestSet)[1]) 
+TestSetClean <- TestSet[,-indColToRemove]
+TestSetClean <- TestSetClean[,-c(1:7)]   
+dim(TestSetClean)
+```
+
+## Correlation Analysis
+
+A correlation among variables is done  before proceeding to the modeling procedures.
+Last column (classe) to be left out.
+
+```{r corr, echo =FALSE}
+corMatrix <- cor(TrainSetClean[, -53])
+corrplot(corMatrix, order = "FPC", method = "color", type = "lower", 
+         tl.cex = 0.8, tl.col = rgb(0, 0, 0))
+```
+
+## Prediction Model Building
+
+Three methods will be applied to model the regressions using the Train dataset and the best one with higher accuracy when applied to the Test dataset will be used for the quiz predictions. The methods are: 
+- Random Forests
+- Decision Tree and 
+- Generalized Boosted Model. 
+A Confusion Matrix is plotted at the end of each analysis to better visualize the accuracy of the models.
+
+### Method 1 : Random Forest
+
+```{r method1, echo = FALSE}
+set.seed(123)
+controlRF <- trainControl(method="cv", number=3, verboseIter=FALSE)
+modFitRF <- train(classe ~ ., data=TrainSetClean, method="rf",
+                          trControl=controlRF)
+modFitRF$finalModel
+
+# prediction Test dataset
+predictRF <- predict(modFitRF, newdata=TestSetClean)
+confMatRF <- confusionMatrix(predictRF, TestSetClean$classe)
+confMatRF
+
+# plot matrix results
+plot(confMatRF$table, col = confMatRF$byClass, 
+     main = paste("Random Forest - Accuracy =",
+                  round(confMatRF$overall['Accuracy'], 4)))
+```
+
+### Method 2 : Decision Trees
+
+```{r method2, echo=FALSE}
+set.seed(123)
+modFitDT <- rpart(classe ~ ., data=TrainSetClean, method="class")
+
+# prediction Test dataset
+predictDT <- predict(modFitDT, newdata=TestSetClean, type="class")
+confMatDT <- confusionMatrix(predictDT, TestSetClean$classe)
+confMatDT
+
+# plot matrix results
+plot(confMatDT$table, col = confMatDT$byClass, 
+     main = paste("Decision Tree - Accuracy =",
+                  round(confMatDT$overall['Accuracy'], 4)))
+```
+
+## Method 3 : Generalized Boosted Model
+
+```{r method3, echo = FALSE}
+set.seed(123)
+controlGBM <- trainControl(method = "repeatedcv", number = 5, repeats = 1)
+modFitGBM  <- train(classe ~ ., data=TrainSetClean, method = "gbm",
+                    trControl = controlGBM, verbose = FALSE)
+
+# prediction Test dataset
+predictGBM <- predict(modFitGBM, newdata=TestSetClean)
+confMatGBM <- confusionMatrix(predictGBM, TestSetClean$classe)
+confMatGBM
+
+# plot matrix results
+plot(confMatGBM$table, col = confMatGBM$byClass, 
+     main = paste("GBM - Accuracy =", round(confMatGBM$overall['Accuracy'], 4)))
+```
+
+## Comparing results 
+Use the best Model to predict/validate the Test Data
+
+The accuracy of the 3 regression modeling methods used above are:
+
+- Random Forest : 0.9934  
+- Decision Tree : 0.7517   
+- GBM : 0.9599  
+The Random Forest model scores best and will be used
+to predict the 20 quiz results on testing dataset as shown below.
+
+```{r final, echo = TRUE}
+quizPrediction <- predict(modFitRF, newdata=testing)
+quizPrediction
+```
+
