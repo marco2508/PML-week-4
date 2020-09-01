@@ -122,6 +122,7 @@ confMatRF
 plot(confMatRF$table, col = confMatRF$byClass, 
      main = paste("Random Forest - Accuracy =",
                   round(confMatRF$overall['Accuracy'], 4)))
+res1 <- round(confMatRF$overall['Accuracy'], 4)
 ```
 
 ### Method 2 : Decision Trees
@@ -139,6 +140,7 @@ confMatDT
 plot(confMatDT$table, col = confMatDT$byClass, 
      main = paste("Decision Tree - Accuracy =",
                   round(confMatDT$overall['Accuracy'], 4)))
+res2 <- round(confMatDT$overall['Accuracy'], 4)
 ```
 
 ## Method 3 : Generalized Boosted Model
@@ -157,6 +159,7 @@ confMatGBM
 # plot matrix results
 plot(confMatGBM$table, col = confMatGBM$byClass, 
      main = paste("GBM - Accuracy =", round(confMatGBM$overall['Accuracy'], 4)))
+res3 <- round(confMatGBM$overall['Accuracy'], 4)
 ```
 
 ## Comparing results 
@@ -164,9 +167,9 @@ Use the best Model to predict/validate the Test Data
 
 The accuracy of the 3 regression modeling methods used above are:
 
-- Random Forest : 0.9934  
-- Decision Tree : 0.7517   
-- GBM : 0.9599  
+- Random Forest : `r res1`  
+- Decision Tree : `r res2`   
+- GBM : `r res3`  
 The Random Forest model scores best and will be used
 to predict the 20 quiz results on testing dataset as shown below.
 
@@ -174,4 +177,5 @@ to predict the 20 quiz results on testing dataset as shown below.
 quizPrediction <- predict(modFitRF, newdata=testing)
 quizPrediction
 ```
+
 
